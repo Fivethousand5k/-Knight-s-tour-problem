@@ -1,0 +1,344 @@
+#include<stdio.h>
+#include<stdlib.h>
+#include<time.h>
+#include<Windows.h>
+
+
+
+#define WIDTH 24
+#define VERTICAL 1			//垂直的路
+#define HORIZONTAL 0			//水平的路
+#define Horse_Tag 7
+
+#define LEFT_2_UP_1 'A'
+#define LEFT_1_UP_2 'B'
+#define RIGHT_1_UP_2 'C'
+#define RIGHT_2_UP_1 'D'
+#define RIGHT_2_DOWN_1 'E'
+#define	RIGHT_1_DOWN_2 'F'
+#define LEFT_1_DOWN_2 'G'
+#define LEFT_2_DOWN_1 'H'
+#define OVER 'O';
+
+#define WALL 1
+typedef struct position {
+	int value;				// '0' represents a wall, while '1' represents an accessible position.
+	bool isvisited;			//马是否来过这个位置了
+
+
+}PST;
+typedef struct node 
+{
+	int x;
+	int y;
+}NODE;
+
+typedef struct ar
+{
+	int num;
+	char togo;
+}ARRAY;
+
+PST matrix[WIDTH+2][WIDTH+2];
+NODE path[WIDTH*WIDTH];
+
+int found = 0;						//用于记录找到的路径个数
+int count_barrier = 0;				//用于记录设置的障碍个数
+void init()
+
+{
+	void set_road(int col, int value);
+	for (int i = 0; i < WIDTH+1; i++)
+	{
+		for (int j = 0; j < WIDTH+1; j++)
+		{
+
+			matrix[i][j].value = 0;
+			matrix[i][j].isvisited = false;
+		}
+	}
+	set_road(0, VERTICAL);								//设置地图的边框
+	set_road(0, HORIZONTAL);
+	set_road(WIDTH+1, HORIZONTAL);
+	set_road(WIDTH+1, VERTICAL);
+}
+
+void set_road(int col, int value)	//col代表将哪一行或者列设置成路(将他们的值++);	 if the value equals 1,it means the road would be set vertically, otherwise horizontally.
+{
+	if (value == VERTICAL)
+	{
+		for (int i = 0; i < WIDTH+1; i++)
+		{
+			matrix[col][i].value++;
+		}
+	}
+	else
+	{
+		for (int i = 0; i < WIDTH+1; i++)
+		{
+			matrix[i][col].value++;
+		}
+
+	}
+}
+
+
+void set_horse_position(int &horse_x, int &horse_y, int x, int y)			//To preset the horse's position at the very begining
+{
+	matrix[x][y].value = Horse_Tag;
+	horse_x = x;
+	horse_y = y;
+
+}
+
+void set_barrier(int x, int y)			//设置障碍，别马脚
+{
+	matrix[x][y].value = 1;
+	matrix[x][y].isvisited = true;
+	count_barrier++;
+}
+
+
+void gotoxy(unsigned char x, unsigned char y) {
+	//COORD是Windows API中定义的一种结构，表示一个字符在控制台屏幕上的坐标
+	COORD cor;
+
+	//句柄 
+	HANDLE hout;
+
+	//设定我们要定位到的坐标 
+	cor.X = 2 * y;
+	cor.Y = x;
+
+	//GetStdHandle函数获取一个指向特定标准设备的句柄，包括标准输入，标准输出和标准错误。
+	//STD_OUTPUT_HANDLE正是代表标准输出（也就是显示屏）的宏 
+	hout = GetStdHandle(STD_OUTPUT_HANDLE);
+
+	//SetConsoleCursorPosition函数用于设置控制台光标的位置
+	SetConsoleCursorPosition(hout, cor);
+}
+
+void show_path()
+{
+	system("cls");
+	for (int i = 0; i < WIDTH+2; i++)
+	{
+		for (int j = 0; j < WIDTH+2; j++)
+		{
+
+
+			if (matrix[i][j].value != WALL)
+				printf("  ", matrix[i][j].value);
+			else
+				printf("* ");
+		}
+		printf("\n");
+	}
+	printf("\n\n开始展示找到的第%d条路径",found);			//地图生成完毕
+	
+	
+	for (int i = 0; i < WIDTH*WIDTH; i++)				//将路径动态显示出来
+	{
+		gotoxy(path[i].x, path[i].y);
+		printf("M");
+		Sleep(50);
+	}
+
+}
+
+int get_next(int x,int y, ARRAY next_step[],int step,int count)			//用于寻找马周围八个方向中接下来一步可走位置最少的一个位置
+{
+	int k = 0;
+	if (x - 1 > 0 && y - 2 > 0 && matrix[x - 1][y - 2].isvisited == false&& matrix[x][y - 1].value==0)				// 左2上1 可以走吗？ 并且检测是否有别马脚
+	{
+		k++;
+		if (count < 1)
+		{
+			next_step[0].num=get_next(x - 1, y - 2, next_step,step, count + 1);
+			next_step[0].togo = LEFT_2_UP_1;
+			if (step == WIDTH * WIDTH - 1-count_barrier)					//如果走到了最后一步，还只剩下最后一个格子的情况
+			{
+				next_step[0].num = 1;						//将值置为一个正数（不一定要是1），以便于最后一步可执行	。否则最后一步会检测到无路可走
+			}
+		}
+	}
+	if (x - 2 > 0 && y - 1 > 0 && matrix[x - 2][y - 1].isvisited == false && matrix[x-1][y].value == 0)		// 左1上2可走吗？ 并且检测是否有别马脚
+	{
+		k++;
+		if (count < 1)
+		{
+			next_step[1].num=get_next(x - 2, y - 1, next_step,step, count + 1);
+			next_step[1].togo= LEFT_1_UP_2;
+			if (step == WIDTH * WIDTH - 1-count_barrier)					//如果走到了最后一步，还只剩下最后一个格子的情况
+			{
+				next_step[1].num = 1;						//将值置为一个正数（不一定要是1），以便于最后一步可执行	。否则最后一步会检测到无路可走
+			}
+		}
+	}
+	if (x - 2 > 0 && y + 1 <= WIDTH && matrix[x - 2][y + 1].isvisited == false && matrix[x - 1][y].value == 0)		// 右1上2可以走吗
+	{
+		k++;
+		if (count < 1)
+		{
+			next_step[2].num=get_next(x - 2, y + 1, next_step,step, count + 1);
+			next_step[2].togo = RIGHT_1_UP_2;
+			if (step == WIDTH * WIDTH - 1-count_barrier)					//如果走到了最后一步，还只剩下最后一个格子的情况
+			{
+				next_step[2].num = 1;						//将值置为一个正数（不一定要是1），以便于最后一步可执行	。否则最后一步会检测到无路可走
+			}
+		}
+
+	}
+	if (x - 1 > 0 && y + 2 <= WIDTH && matrix[x - 1][y + 2].isvisited == false && matrix[x][y+1].value == 0)		// 右2上1可以走吗
+	{
+		k++;
+		if (count < 1)
+		{
+			next_step[3].num = get_next(x - 1, y + 2, next_step,step, count + 1);
+			next_step[3].togo = RIGHT_2_UP_1;
+		}
+		if (step == WIDTH * WIDTH - 1-count_barrier)					//如果走到了最后一步，还只剩下最后一个格子的情况
+		{
+			next_step[3].num = 1;						//将值置为一个正数（不一定要是1），以便于最后一步可执行	。否则最后一步会检测到无路可走
+		}
+	}
+
+	if (x + 1 <= WIDTH && y + 2 <= WIDTH && matrix[x + 1][y + 2].isvisited == false&&matrix[x][y + 1].value == 0)				// 右2下1可以走吗？ 并且检测是否有别马脚
+	{
+		k++;
+		if (count < 1)
+		{
+			next_step[4].num = get_next(x + 1, y + 2, next_step,step, count + 1);
+			next_step[4].togo = RIGHT_2_DOWN_1;
+			if (step == WIDTH * WIDTH - 1-count_barrier)					//如果走到了最后一步，还只剩下最后一个格子的情况
+			{
+				next_step[4].num = 1;						//将值置为一个正数（不一定要是1），以便于最后一步可执行	。否则最后一步会检测到无路可走
+			}
+		}
+	}
+	if (x + 2 <= WIDTH && y + 1 <= WIDTH && matrix[x + 2][y + 1].isvisited == false && matrix[x+1][y].value == 0)		// 右1下2可走吗？ 并且检测是否有别马脚
+	{
+		k++;
+		if (count < 1)
+		{
+			next_step[5].num = get_next(x + 2, y + 1, next_step,step, count + 1);
+			next_step[5].togo = RIGHT_1_DOWN_2;
+			if (step == WIDTH * WIDTH - 1-count_barrier)					//如果走到了最后一步，还只剩下最后一个格子的情况
+			{
+				next_step[5].num = 1;						//将值置为一个正数（不一定要是1），以便于最后一步可执行	。否则最后一步会检测到无路可走
+			}
+		}
+	}
+	if (x + 2 <= WIDTH && y - 1 > 0 && matrix[x + 2][y - 1].isvisited == false && matrix[x + 1][y].value == 0)		// 左1下2可以走吗
+	{
+		k++;
+		if (count < 1)
+		{
+			next_step[6].num = get_next(x + 2, y - 1, next_step,step, count + 1);
+			next_step[6].togo=LEFT_1_DOWN_2;
+			if (step == WIDTH * WIDTH - 1-count_barrier)					//如果走到了最后一步，还只剩下最后一个格子的情况
+			{
+				next_step[6].num = 1;						//将值置为一个正数（不一定要是1），以便于最后一步可执行	。否则最后一步会检测到无路可走
+			}
+		}
+
+	}
+	if (x + 1 <= WIDTH && y - 2 > 0 && matrix[x + 1][y - 2].isvisited == false && matrix[x][y - 1].value == 0)		// 左2下1可以走吗 并且检测是否有别马脚
+	{
+		k++;
+		if (count < 1)
+		{
+			next_step[7].num = get_next(x + 1, y - 2, next_step,step, count + 1);
+			next_step[7].togo = LEFT_2_DOWN_1;
+			if (step == WIDTH * WIDTH - 1-count_barrier)					//如果走到了最后一步，还只剩下最后一个格子的情况
+			{
+				next_step[7].num = 1;						//将值置为一个正数（不一定要是1），以便于最后一步可执行	。否则最后一步会检测到无路可走
+			}
+		}
+	}
+	return k;
+}
+
+
+
+int Comp(const void *p1, const void *p2)	//用于比较结构体数组的快排
+{
+	ARRAY *c = (ARRAY*)p1;
+	ARRAY *d = (ARRAY*)p2;
+	return (c->num - d->num);
+}
+
+void DFS_optimized_with_greed(int horse_x,int horse_y,int step)					//贪心算法优化后的深度遍历搜索
+{
+	printf("我现在在  (%d,%d)  第%d步\n", horse_x, horse_y,step);
+	path[step - 1].x = horse_x;		//将走过的点存入路径数组中，因为step从1开始计数，所以路径数组要从step-1开始计数
+	path[step - 1].y = horse_y;
+	matrix[horse_x][horse_y].isvisited = true;
+	if (step == WIDTH * WIDTH-count_barrier)		//如果马将棋盘走满了
+	{
+		found++;
+		printf("找到了一个诶！");
+		show_path();
+	}
+	ARRAY next_step[8];				//用于记录8个方向的位置
+	if (get_next(horse_x, horse_y, next_step,step, 0) == 0)
+	{
+		
+	}
+	else
+	{
+		qsort(next_step,8, sizeof(next_step[0]), Comp);			//对结构体数组进行排序
+		for (int i = 0; i < 8; i++)
+		{
+			if (next_step[i].num != 0)
+			{
+				switch (next_step[i].togo)
+				{
+				case LEFT_2_UP_1: DFS_optimized_with_greed(horse_x - 1, horse_y - 2, step + 1); break;
+				case LEFT_1_UP_2: DFS_optimized_with_greed(horse_x - 2, horse_y - 1, step + 1); break;
+				case RIGHT_1_UP_2:DFS_optimized_with_greed(horse_x - 2, horse_y + 1, step + 1); break;
+				case RIGHT_2_UP_1:DFS_optimized_with_greed(horse_x - 1, horse_y + 2, step + 1); break;
+				case RIGHT_2_DOWN_1:DFS_optimized_with_greed(horse_x + 1, horse_y + 2, step + 1);break;
+				case RIGHT_1_DOWN_2:DFS_optimized_with_greed(horse_x + 2, horse_y + 1, step + 1); break;
+				case LEFT_1_DOWN_2: DFS_optimized_with_greed(horse_x + 2, horse_y -1, step + 1);  break;
+				case LEFT_2_DOWN_1: DFS_optimized_with_greed(horse_x + 1, horse_y - 2, step + 1); break;
+				default:break;
+				}
+
+			}
+		}
+
+
+	}
+	matrix[horse_x][horse_y].isvisited = false;
+	
+}
+
+int main()
+{
+	int horse_x, horse_y;			//horse's x and y
+	int count = 0;			//to count the dog's total steps
+	
+	bool set_bool = false;
+	srand((int)time(0));
+	init();
+	set_horse_position(horse_x, horse_y,WIDTH/2, WIDTH/2);
+	
+	//set_barrier(3, 4);
+	//set_barrier(6, 4);
+	
+	DFS_optimized_with_greed(horse_x, horse_y, 1);
+
+
+
+
+
+
+
+	
+	system("pause");
+
+	return 0;
+
+
+}
